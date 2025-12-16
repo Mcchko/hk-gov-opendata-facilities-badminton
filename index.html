@@ -1,0 +1,1825 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>香港羽毛球設施地圖搜尋器</title>
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+        integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+    <!-- Leaflet.draw CSS -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css" />
+    <!-- Bootstrap for accordion styling -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Font Awesome for icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Marker clustering CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" />
+    <style>
+        .element-hidden {
+            display: none !important;
+        }
+
+        /* Reset & Base */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Microsoft JhengHei', 'Segoe UI', 'Inter', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+            background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+            min-height: 100vh;
+            padding: 16px;
+            color: #1f2937;
+        }
+
+        /* Layout */
+        .container {
+            max-width: 1600px;
+            margin: 0 auto;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            min-height: 100vh;
+        }
+
+        /* Header */
+        .header {
+            background: rgba(255, 255, 255, 0.95);
+            padding: 16px 20px;
+            border-radius: 16px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+            backdrop-filter: blur(12px);
+            text-align: center;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .header h1 {
+            color: #111827;
+            font-size: 1.875rem;
+            font-weight: 700;
+            margin-bottom: 8px;
+            background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .header p {
+            color: #6b7280;
+            font-size: 1rem;
+            line-height: 1.5;
+        }
+
+        /* Main Content */
+        .main-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        /* Map Section */
+        .map-container {
+            flex: 1;
+            min-height: 60vh;
+            border-radius: 16px;
+            overflow: hidden;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            position: relative;
+        }
+
+        #map {
+            height: 100%;
+            width: 100%;
+            border-radius: 16px;
+        }
+
+        /* Control Panel */
+        .map-control-panel {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            z-index: 1000;
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 12px;
+            padding: 16px;
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            width: 320px;
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+
+        .panel-title {
+            color: #111827;
+            font-size: 1.1rem;
+            font-weight: 600;
+            margin-bottom: 12px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #e5e7eb;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            cursor: pointer;
+        }
+
+        .panel-title .collapse-icon {
+            color: #4f46e5;
+            font-size: 0.9rem;
+            transition: transform 0.3s ease;
+        }
+
+        .panel-title .collapse-icon.collapsed {
+            transform: rotate(-90deg);
+        }
+
+        /* Instructions */
+        .instructions {
+            background: linear-gradient(135deg, #f3f4f6 0%, #f9fafb 100%);
+            padding: 16px;
+            border-radius: 10px;
+            border-left: 4px solid #4f46e5;
+            margin-bottom: 20px;
+            max-height: 300px;
+            overflow: hidden;
+            transition: max-height 0.3s ease, opacity 0.3s ease, margin-bottom 0.3s ease;
+        }
+
+        .instructions.collapsed {
+            max-height: 0;
+            opacity: 0;
+            margin-bottom: 0;
+            padding: 0;
+            border: none;
+        }
+
+        .instructions p {
+            margin-bottom: 10px;
+            color: #374151;
+            line-height: 1.5;
+            font-size: 0.9rem;
+            position: relative;
+            padding-left: 18px;
+        }
+
+        .instructions p:last-child {
+            margin-bottom: 0;
+        }
+
+        .instructions p::before {
+            content: "•";
+            color: #4f46e5;
+            font-weight: bold;
+            position: absolute;
+            left: 0;
+        }
+
+        /* Sidebar Panel */
+        .sidebar-panel {
+            background: white;
+            width: 400px;
+            border-radius: 10px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            padding: 20px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            max-height: 80vh;
+        }
+
+        .sidebar-header {
+            background-color: #4a6491;
+            color: white;
+            padding: 12px 15px;
+            border-radius: 6px;
+            margin-bottom: 15px;
+            text-align: center;
+        }
+
+        .controls {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-bottom: 20px;
+        }
+
+        .controls button {
+            background-color: #4a6491;
+            color: white;
+            border: none;
+            padding: 8px 12px;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+            font-size: 0.9rem;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .controls button:hover {
+            background-color: #3a5471;
+        }
+
+        #districts-accordion {
+            flex: 1;
+            overflow-y: auto;
+            min-height: 300px;
+        }
+
+        .district-header {
+            background-color: #4a6491;
+            color: white;
+            padding: 12px 15px;
+            border-radius: 6px;
+            margin-bottom: 8px;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: all 0.3s;
+            user-select: none;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .district-header:hover {
+            background-color: #3a5471;
+        }
+
+        .district-header i.fa-chevron-down {
+            transition: transform 0.3s ease;
+        }
+
+        .district-header.active {
+            background-color: #3a5471;
+            border-radius: 6px 6px 0 0;
+            margin-bottom: 0;
+        }
+
+        .district-content {
+            padding: 0;
+            background-color: #f8f9fa;
+            margin-bottom: 10px;
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease-out;
+            border-radius: 0 0 6px 6px;
+            border: 1px solid #dee2e6;
+            border-top: none;
+        }
+
+        .district-content.show {
+            padding: 15px;
+            max-height: 800px;
+            overflow-y: auto;
+        }
+
+        /* Venue Header - 場館分組標題 */
+        .venue-header {
+            background-color: #e9ecef;
+            color: #495057;
+            padding: 10px 12px;
+            border-radius: 4px;
+            margin: 10px 0 8px 0;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-weight: 600;
+            border-left: 4px solid #6c757d;
+            transition: all 0.2s;
+        }
+
+        .venue-header:hover {
+            background-color: #dee2e6;
+        }
+
+        .venue-header i.fa-chevron-down {
+            transition: transform 0.3s ease;
+            font-size: 0.9rem;
+        }
+
+        .venue-header.active {
+            background-color: #dee2e6;
+            border-left: 4px solid #4a6491;
+        }
+
+        .venue-sessions {
+            padding-left: 10px;
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease-out;
+        }
+
+        .venue-sessions.show {
+            max-height: 2000px;
+            overflow-y: auto;
+        }
+
+        .venue-item {
+            background-color: white;
+            border-radius: 6px;
+            padding: 12px;
+            margin: 8px 0;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+            border-left: 4px solid #28a745;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .venue-item:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        .venue-item h5 {
+            color: #2c3e50;
+            margin-bottom: 6px;
+            font-size: 1rem;
+            font-weight: 600;
+        }
+
+        .venue-address {
+            color: #666;
+            font-size: 0.85rem;
+            margin-bottom: 8px;
+            line-height: 1.4;
+            padding-left: 8px;
+            border-left: 2px solid #dee2e6;
+        }
+
+        .session-info {
+            background-color: #e9f7ef;
+            padding: 8px;
+            border-radius: 4px;
+            margin-top: 8px;
+        }
+
+        .session-date {
+            font-weight: bold;
+            color: #28a745;
+            font-size: 0.9rem;
+        }
+
+        .session-time {
+            color: #666;
+            font-size: 0.85rem;
+        }
+
+        .available-courts {
+            display: inline-block;
+            padding: 3px 8px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: bold;
+            margin-top: 6px;
+        }
+
+        .available-0 {
+            background-color: #f8d7da;
+            color: #721c24;
+        }
+
+        .available-1,
+        .available-2,
+        .available-3,
+        .available-4,
+        .available-5,
+        .available-6,
+        .available-7,
+        .available-8,
+        .available-9,
+        .available-10 {
+            background-color: #d4edda;
+            color: #155724;
+        }
+
+        .stats {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 15px;
+            padding-top: 15px;
+            border-top: 1px solid #ddd;
+            font-size: 0.9rem;
+            color: #666;
+        }
+
+        .legend {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            margin-top: 15px;
+            padding-top: 15px;
+            border-top: 1px solid #ddd;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            font-size: 0.85rem;
+        }
+
+        .legend-color {
+            width: 15px;
+            height: 15px;
+            border-radius: 3px;
+        }
+
+        /* Loading */
+        .loading {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 40px;
+            text-align: center;
+            color: #666;
+        }
+
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #4a6491;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin-bottom: 15px;
+        }
+
+        @keyframes spin {
+            0% {
+                transform: rotate(0deg);
+            }
+
+            100% {
+                transform: rotate(360deg);
+            }
+        }
+
+        .error-message {
+            background-color: #f8d7da;
+            color: #721c24;
+            padding: 15px;
+            border-radius: 6px;
+            margin: 20px 0;
+            border: 1px solid #f5c6cb;
+        }
+
+        .retry-button {
+            background-color: #dc3545;
+            color: white;
+            border: none;
+            padding: 8px 15px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin-top: 10px;
+        }
+
+        .retry-button:hover {
+            background-color: #c82333;
+        }
+
+        /* Clear All Button */
+        .clear-all-btn {
+            position: absolute;
+            bottom: 60px;
+            left: 10px;
+            z-index: 1000;
+            background: #ef4444;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            padding: 10px 16px;
+            box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
+            cursor: pointer;
+            font-size: 0.9rem;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            transition: all 0.2s ease;
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        .clear-all-btn.visible {
+            opacity: 1;
+            pointer-events: all;
+        }
+
+        .clear-all-btn:hover {
+            background: #dc2626;
+            transform: translateY(-2px);
+            box-shadow: 0 6px 16px rgba(239, 68, 68, 0.4);
+        }
+
+        /* Mobile Toggle Button */
+        .mobile-toggle {
+            display: none;
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            z-index: 1001;
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 8px;
+            padding: 10px 14px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            cursor: pointer;
+            font-size: 0.9rem;
+            font-weight: 600;
+            color: #4f46e5;
+        }
+
+        /* Panel Close Button */
+        .panel-close-btn {
+            display: none;
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: #ef4444;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            padding: 10px 16px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            font-weight: 600;
+            align-items: center;
+            gap: 6px;
+            z-index: 1002;
+        }
+
+        /* Panel Overlay */
+        .panel-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 1998;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.3s ease, visibility 0.3s ease;
+        }
+
+        .panel-overlay.visible {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        /* Custom Markers */
+        .marker-cluster {
+            background-color: rgba(42, 100, 150, 0.6);
+            border-radius: 50%;
+            color: white;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .marker-cluster div {
+            background-color: rgba(42, 100, 150, 0.8);
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .venue-marker {
+            background-color: #28a745;
+            border-radius: 50%;
+            border: 2px solid white;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
+        }
+
+        /* Footer */
+        .footer {
+            text-align: center;
+            color: rgba(255, 255, 255, 0.9);
+            font-size: 0.875rem;
+            padding: 10px;
+            margin-top: auto;
+        }
+
+        /* Mobile Optimizations */
+        @media (max-width: 768px) {
+            #map {
+                min-height: 60vh;
+            }
+
+            body {
+                padding: 12px;
+            }
+
+            .container {
+                gap: 16px;
+            }
+
+            .header {
+                padding: 16px;
+                border-radius: 12px;
+            }
+
+            .header h1 {
+                font-size: 1.5rem;
+            }
+
+            .map-container {
+                height: 400px !important;
+                border-radius: 12px;
+            }
+
+            .map-control-panel {
+                position: fixed;
+                top: 0;
+                left: 0;
+                right: 0;
+                bottom: 0;
+                width: 85%;
+                max-width: 400px;
+                max-height: 100%;
+                border-radius: 0;
+                z-index: 2000;
+                transform: translateX(-100%);
+                transition: transform 0.3s ease;
+                overflow-y: auto;
+                padding: 60px 20px 20px;
+                background: rgba(255, 255, 255, 0.98);
+                backdrop-filter: blur(20px);
+                box-shadow: 5px 0 25px rgba(0, 0, 0, 0.2);
+            }
+
+            .map-control-panel.mobile-visible {
+                transform: translateX(0);
+            }
+
+            .mobile-toggle {
+                display: block;
+            }
+
+            .panel-close-btn {
+                display: flex;
+            }
+
+            .sidebar-panel {
+                width: 100%;
+                /* max-height: calc(100vh - 120px); */
+            }
+
+            .controls button {
+                flex: 1;
+                min-width: 120px;
+            }
+        }
+
+        @media (min-width: 769px) {
+            .main-content {
+                flex-direction: row;
+            }
+
+            .map-container {
+                flex: 2;
+                margin-right: 20px;
+            }
+
+            .sidebar-panel {
+                flex: 1;
+                max-height: calc(100vh - 200px);
+            }
+
+            .panel-overlay,
+            .panel-close-btn,
+            .mobile-toggle {
+                display: none !important;
+            }
+
+            .map-control-panel {
+                display: none;
+            }
+        }
+
+        /* Leaflet Customizations */
+        .leaflet-control-layers {
+            border-radius: 8px !important;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1) !important;
+        }
+
+        .leaflet-draw-toolbar {
+            border-radius: 8px !important;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1) !important;
+        }
+
+        .leaflet-draw-toolbar a {
+            border-radius: 6px !important;
+        }
+
+        /* Hide edit toolbar */
+        .leaflet-draw-toolbar.leaflet-bar.leaflet-draw-toolbar-top.leaflet-draw-toolbar-notop.leaflet-draw-toolbar-nobottom {
+            display: none !important;
+        }
+
+        /* Hide zoom control from topleft */
+        .leaflet-control-zoom {
+            display: none !important;
+        }
+
+        /* Position draw control at bottomleft */
+        .leaflet-draw.leaflet-control {
+            bottom: 10px !important;
+            left: 10px !important;
+            top: auto !important;
+            right: auto !important;
+        }
+
+        .leaflet-draw-toolbar {
+            margin-bottom: 0 !important;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <header class="header">
+            <h1><i class="fas fa-map-marked-alt"></i> 香港羽毛球設施地圖搜尋器</h1>
+            <p class="subtitle">按地區探索體育設施及可用時段資訊 | 使用矩形工具選擇範圍</p>
+        </header>
+        <main class="main-content">
+            <section class="map-container">
+                <div class="mobile-toggle" id="mobile-toggle">
+                    <i class="fas fa-bars"></i> 控制面板
+                </div>
+                <div id="map"></div>
+                <!-- Clear All Button -->
+                <button id="clear-all-btn" class="clear-all-btn">
+                    <i class="fas fa-trash-alt"></i> 清除所有範圍
+                </button>
+                <aside class="map-control-panel" id="control-panel">
+                    <!-- Panel Close Button for Mobile -->
+                    <button class="panel-close-btn" id="panel-close-btn">
+                        <i class="fas fa-times"></i> 關閉
+                    </button>
+                    <div class="control-section">
+                        <h2 class="panel-title" id="instructions-toggle">
+                            使用指引
+                            <span class="collapse-icon" id="collapse-icon-instructions">
+                                <i class="fas fa-caret-down"></i>
+                            </span>
+                        </h2>
+                        <div class="instructions" id="instructions">
+                            <p><strong>繪製範圍：</strong>點擊矩形工具（左下角），然後在地圖上點擊並拖動</p>
+                            <p><strong>篩選設施：</strong>繪製範圍後，系統會顯示該範圍內的體育設施</p>
+                            <p><strong>刪除範圍：</strong>點擊「清除所有範圍」按鈕（左下角）以移除矩形</p>
+                            <p><strong>取消繪製：</strong>按下 ESC 鍵或點擊地圖其他位置</p>
+                            <p><strong>點擊設施：</strong>點擊地圖上的標記查看詳細資訊</p>
+                            <p><strong>側邊欄：</strong>查看所有設施列表，點擊項目可定位到地圖位置</p>
+                        </div>
+                    </div>
+                </aside>
+                <!-- Panel Overlay for Mobile -->
+                <div class="panel-overlay" id="panel-overlay"></div>
+            </section>
+            <aside class="sidebar-panel">
+                <div class="sidebar-header">
+                    <h3><i class="fas fa-list-alt"></i> 體育設施列表</h3>
+                    <p>按地區分類，點擊查看詳細資訊</p>
+                </div>
+                <div class="controls">
+                    <button id="zoom-to-hk"><i class="fas fa-globe-asia"></i> 查看全部</button>
+                    <button id="reset-view"><i class="fas fa-sync-alt"></i> 重置視圖</button>
+                    <button id="expand-all"><i class="fas fa-expand"></i> 展開所有</button>
+                    <button id="collapse-all"><i class="fas fa-compress"></i> 收合所有</button>
+                </div>
+                <div id="districts-accordion">
+                    <div class="loading" id="loading-indicator">
+                        <div class="spinner"></div>
+                        <p>正在載入設施資料... （約 40 秒）</p>
+                    </div>
+                </div>
+                <div class="stats">
+                    <div id="total-venues">設施數量: 0</div>
+                    <div id="total-sessions">時段數量: 0</div>
+                    <div id="total-districts">地區數量: 0</div>
+                </div>
+                <div class="legend">
+                    <div class="legend-item">
+                        <div class="legend-color" style="background-color: #28a745;"></div>
+                        <span>有可用場地</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color" style="background-color: #dc3545;"></div>
+                        <span>場地已滿</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color" style="background-color: #4a6491;"></div>
+                        <span>地區群組</span>
+                    </div>
+                </div>
+            </aside>
+        </main>
+        <footer class="footer">
+            <p>香港羽毛球設施地圖搜尋器 | 使用 LeafletJS 創建 | 地圖範圍選擇器</p>
+        </footer>
+    </div>
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+        integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+    <!-- Leaflet.draw JS -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>
+    <!-- Marker clustering plugin -->
+    <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+    <script>
+        // ==================== 地圖範圍選擇器功能 ====================
+        window.__gc__ = {
+            DEFAULT: {
+                COORDINATE: {
+                    lat: 22.3023,
+                    lng: 114.1745,
+                    zoom: 11
+                }
+            }
+        };
+
+        // 初始化地圖，移除預設縮放控制
+        const map = L.map('map', {
+            zoomControl: false, // 移除預設縮放控制
+            attributionControl: true
+        }).setView(
+            [
+                window.__gc__.DEFAULT.COORDINATE.lat,
+                window.__gc__.DEFAULT.COORDINATE.lng
+            ],
+            window.__gc__.DEFAULT.COORDINATE.zoom
+        );
+
+        // 添加自定義縮放控制至左下角
+        L.control.zoom({
+            position: 'bottomleft'
+        }).addTo(map);
+
+        // 添加地圖圖層
+        const tileLayers = {
+            "開放街道地圖": L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '© OpenStreetMap',
+                maxZoom: 19,
+                subdomains: ['a', 'b', 'c']
+            }),
+            "衛星圖像": L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+                attribution: '© Esri',
+                maxZoom: 19
+            }),
+            "地形圖": L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
+                attribution: '© OpenTopoMap',
+                maxZoom: 17
+            })
+        };
+
+        // 添加預設地圖圖層
+        tileLayers["開放街道地圖"].addTo(map);
+
+        // 添加圖層控制至左上角
+        L.control.layers(tileLayers, null, {
+            collapsed: true,
+            position: 'topleft'
+        }).addTo(map);
+
+        // 初始化繪製項目圖層
+        const drawnItems = new L.FeatureGroup();
+        map.addLayer(drawnItems);
+
+        // ==================== 體育設施地圖功能 ====================
+        const loadUnixTimestamp = Date.now();
+        let facilitiesData = [];
+        let currentOpenDistrict = null;
+        let currentOpenVenue = null;
+        let currentRectangleBounds = null;
+
+        // 創建標記群組
+        const markers = L.markerClusterGroup({
+            iconCreateFunction: function (cluster) {
+                return L.divIcon({
+                    html: '<div><span>' + cluster.getChildCount() + '</span></div>',
+                    className: 'marker-cluster',
+                    iconSize: L.point(40, 40)
+                });
+            }
+        });
+
+        // 儲存數據結構
+        let districtVenues = {}; // 地區 -> 場館 -> 時段
+        let allMarkers = []; // 儲存所有標記以便篩選
+
+        // 獲取 UI 元素
+        const clearAllBtn = document.getElementById('clear-all-btn');
+
+        // 在左下角初始化繪製控制 - 無編輯模式
+        const drawControl = new L.Control.Draw({
+            position: 'bottomleft',
+            draw: {
+                polygon: false,
+                polyline: false,
+                circle: false,
+                circlemarker: false,
+                marker: false,
+                rectangle: {
+                    shapeOptions: {
+                        color: '#4f46e5',
+                        weight: 3,
+                        fillColor: '#4f46e5',
+                        fillOpacity: 0.15,
+                        dashArray: '8, 4'
+                    },
+                    repeatMode: false,
+                    metric: true
+                }
+            },
+            edit: false
+        });
+
+        // 將繪製控制添加到地圖
+        map.addControl(drawControl);
+
+        // 清除所有範圍按鈕功能
+        clearAllBtn.addEventListener('click', function () {
+            // 清除所有繪製項目
+            drawnItems.clearLayers();
+            currentRectangleBounds = null;
+            clearAllBtn.classList.remove('visible');
+
+            // 重置所有設施標記的顯示
+            resetAllMarkers();
+
+            // 顯示反饋訊息
+            showNotification('矩形範圍已清除，顯示所有設施', 'success');
+        });
+
+        // 顯示通知功能
+        function showNotification(message, type = 'info') {
+            const existingNotification = document.querySelector('.notification');
+            if (existingNotification) existingNotification.remove();
+
+            const notification = document.createElement('div');
+            notification.className = `notification ${type}`;
+            notification.innerHTML = `
+                <i class="fas fa-${type === 'success' ? 'check-circle' : 'info-circle'}"></i>
+                <span>${message}</span>
+            `;
+
+            Object.assign(notification.style, {
+                position: 'fixed',
+                bottom: '20px',
+                right: '20px',
+                backgroundColor: type === 'success' ? '#10b981' : '#3b82f6',
+                color: 'white',
+                padding: '12px 20px',
+                borderRadius: '8px',
+                boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '10px',
+                zIndex: '3000',
+                animation: 'slideIn 0.3s ease-out'
+            });
+
+            document.body.appendChild(notification);
+
+            setTimeout(() => {
+                notification.style.animation = 'slideOut 0.3s ease-out';
+                setTimeout(() => notification.remove(), 300);
+            }, 3000);
+
+            const style = document.createElement('style');
+            style.textContent = `
+                @keyframes slideIn {
+                    from { transform: translateX(100%); opacity: 0; }
+                    to { transform: translateX(0); opacity: 1; }
+                }
+                @keyframes slideOut {
+                    from { transform: translateX(0); opacity: 1; }
+                    to { transform: translateX(100%); opacity: 0; }
+                }
+            `;
+            document.head.appendChild(style);
+        }
+
+        // 可摺疊指引功能
+        const instructionsToggle = document.getElementById('instructions-toggle');
+        const instructions = document.getElementById('instructions');
+        const collapseIconInstructions = document.getElementById('collapse-icon-instructions');
+        let instructionsCollapsed = false;
+
+        instructionsToggle.addEventListener('click', () => {
+            instructionsCollapsed = !instructionsCollapsed;
+            instructions.classList.toggle('collapsed', instructionsCollapsed);
+            collapseIconInstructions.classList.toggle('collapsed', instructionsCollapsed);
+            collapseIconInstructions.innerHTML = instructionsCollapsed ?
+                '<i class="fas fa-caret-right"></i>' :
+                '<i class="fas fa-caret-down"></i>';
+        });
+
+        // 流動裝置控制面板功能
+        const mobileToggle = document.getElementById('mobile-toggle');
+        const controlPanel = document.getElementById('control-panel');
+        const panelOverlay = document.getElementById('panel-overlay');
+        const panelCloseBtn = document.getElementById('panel-close-btn');
+        let panelVisible = window.innerWidth > 768;
+
+        if (window.innerWidth <= 768) {
+            controlPanel.classList.remove('mobile-visible');
+            panelVisible = false;
+            panelOverlay.classList.remove('visible');
+        }
+
+        function togglePanel() {
+            panelVisible = !panelVisible;
+            controlPanel.classList.toggle('mobile-visible', panelVisible);
+            panelOverlay.classList.toggle('visible', panelVisible);
+
+            if (window.innerWidth <= 768) {
+                mobileToggle.innerHTML = '<i class="fas fa-bars"></i> 控制面板';
+                if (panelVisible) {
+                    mobileToggle.classList.add("element-hidden");
+                } else {
+                    mobileToggle.classList.remove("element-hidden");
+                }
+            }
+        }
+
+        mobileToggle.addEventListener('click', togglePanel);
+        panelCloseBtn.addEventListener('click', () => {
+            panelVisible = false;
+            controlPanel.classList.remove('mobile-visible');
+            panelOverlay.classList.remove('visible');
+            mobileToggle.classList.remove("element-hidden");
+        });
+
+        // 處理矩形創建
+        map.on(L.Draw.Event.CREATED, function (event) {
+            // 移除任何現有矩形
+            drawnItems.clearLayers();
+            const rectangle = event.layer;
+            drawnItems.addLayer(rectangle);
+
+            // 獲取範圍邊界
+            const bounds = rectangle.getBounds();
+            currentRectangleBounds = bounds;
+
+            // 顯示清除按鈕
+            clearAllBtn.classList.add('visible');
+
+            // 篩選顯示在範圍內的標記
+            filterMarkersByBounds(bounds);
+
+            // 調整地圖顯示矩形範圍
+            map.fitBounds(bounds, {
+                padding: [60, 60],
+                maxZoom: 19
+            });
+
+            // 顯示成功通知
+            showNotification(`範圍內找到 ${countVisibleMarkers()} 個設施`, 'success');
+        });
+
+        // 處理 ESC 鍵取消繪製
+        document.addEventListener('keydown', function (e) {
+            if (e.key === 'Escape' && map._drawToolbar) {
+                map._drawToolbar.disable();
+                showNotification('繪製已取消', 'info');
+            }
+        });
+
+        // ==================== 體育設施數據功能 ====================
+
+        // 從 API 獲取資料
+        async function fetchData() {
+            const loadingIndicator = document.getElementById('loading-indicator');
+            const apiUrl = `${"https://cors-anywhere.herokuapp.com/"}https://data.smartplay.lcsd.gov.hk/rest/cms/api/v1/publ/contents/open-data/badminton/file`;
+
+            try {
+                loadingIndicator.innerHTML = `
+                    <div class="spinner"></div>
+                    <p>正在載入設施資料...</p>
+                `;
+
+                const response = await fetch(apiUrl);
+                if (!response.ok) {
+                    throw new Error(`HTTP 錯誤! 狀態碼: ${response.status}`);
+                }
+
+                const data = await response.json();
+
+                if (data && Array.isArray(data)) {
+                    facilitiesData = data.filter(facility =>
+                        facility.Venue_Latitude &&
+                        facility.Venue_Longitude &&
+                        facility.Venue_Latitude.trim() !== '' &&
+                        facility.Venue_Longitude.trim() !== ''
+                    );
+
+                    window.facilitiesData = facilitiesData;
+                    loadingIndicator.style.display = 'none';
+
+                    processData();
+                    createMarkers();
+                    createAccordion();
+
+                    if (facilitiesData.length > 0) {
+                        const bounds = markers.getBounds();
+                        if (bounds.isValid()) {
+                            map.fitBounds(bounds, { padding: [50, 50] });
+                        }
+                    }
+
+                    const loadedUnixTimestamp = Date.now();
+                    alert(`載入了 ${parseInt((loadedUnixTimestamp - loadUnixTimestamp) / 1000)} 秒`);
+
+                } else {
+                    throw new Error('從 API 接收的資料格式無效');
+                }
+            } catch (error) {
+                console.error('獲取資料時出錯:', error);
+                loadingIndicator.innerHTML = `
+                    <div class="error-message">
+                        <p><strong>載入資料時出錯:</strong> ${error.message}</p>
+                        <p>請重試或檢查您的網絡連接。</p>
+                        <button class="retry-button" id="retry-button">重試</button>
+                    </div>
+                `;
+
+                document.getElementById('retry-button')?.addEventListener('click', () => {
+                    fetchData();
+                });
+            }
+        }
+
+        // 處理資料並按地區和場館分組
+        function processData() {
+            districtVenues = {};
+
+            // 按地區分組，然後按場館名稱和地址分組
+            facilitiesData.forEach(facility => {
+                const district = facility.District_Name_TC || '未知地區';
+                const venueName = facility.Venue_Name_TC || facility.Venue_Name_EN || '未命名場地';
+                const venueAddress = facility.Venue_Address_TC || facility.Venue_Address_EN || '地址不詳';
+                const venueKey = `${venueName}|${venueAddress}`;
+
+                if (!districtVenues[district]) {
+                    districtVenues[district] = {};
+                }
+
+                if (!districtVenues[district][venueKey]) {
+                    districtVenues[district][venueKey] = {
+                        name: venueName,
+                        address: venueAddress,
+                        sessions: []
+                    };
+                }
+
+                // 添加時段信息
+                districtVenues[district][venueKey].sessions.push(facility);
+            });
+
+            updateStats();
+        }
+
+        // 為每個設施創建標記
+        function createMarkers() {
+            markers.clearLayers();
+            allMarkers = [];
+
+            facilitiesData.forEach(facility => {
+                if (facility.Venue_Latitude == undefined || facility.Venue_Longitude == undefined) return;
+
+                const lat = parseFloat(facility.Venue_Latitude);
+                const lng = parseFloat(facility.Venue_Longitude);
+
+                if (isNaN(lat) || isNaN(lng)) return;
+
+                const marker = L.marker([lat, lng], {
+                    icon: L.divIcon({
+                        className: 'venue-marker',
+                        html: `<div style="width: 15px; height: 15px; background-color: ${facility.Available_Courts === "0" ? '#dc3545' : '#28a745'}; border-radius: 50%; border: 2px solid white;"></div>`,
+                        iconSize: [20, 20]
+                    })
+                });
+
+                const popupContent = `
+                    <div style="max-width: 250px;">
+                        <h4 style="margin-bottom: 5px;">${facility.Venue_Name_TC || facility.Venue_Name_EN || '未命名場地'}</h4>
+                        <p style="margin: 5px 0; font-size: 0.9em; color: #555;">${facility.Venue_Address_TC || facility.Venue_Address_EN || '地址不詳'}</p>
+                        <p style="margin: 5px 0; font-size: 0.9em;"><strong>設施:</strong> ${facility.Facility_Type_Name_TC || facility.Facility_Type_Name_EN || '不適用'}</p>
+                        <p style="margin: 5px 0; font-size: 0.9em;"><strong>位置:</strong> ${facility.Facility_Location_Name_TC || facility.Facility_Location_Name_EN || '不適用'}</p>
+                        <div style="background-color: #f8f9fa; padding: 8px; border-radius: 4px; margin-top: 8px;">
+                            <p style="margin: 3px 0; font-size: 0.85em;"><strong>日期:</strong> ${facility.Available_Date || '不適用'}</p>
+                            <p style="margin: 3px 0; font-size: 0.85em;"><strong>時間:</strong> ${facility.Session_Start_Time || '不適用'} - ${facility.Session_End_Time || '不適用'}</p>
+                            <p style="margin: 3px 0; font-size: 0.85em;">
+                                <strong>可用場地:</strong> 
+                                <span style="padding: 2px 6px; border-radius: 3px; background-color: ${facility.Available_Courts === "0" ? '#f8d7da' : '#d4edda'}; color: ${facility.Available_Courts === "0" ? '#721c24' : '#155724'}">
+                                    ${facility.Available_Courts === "0" ? '已滿' : (facility.Available_Courts || '0') + ' 個'}
+                                </span>
+                            </p>
+                        </div>
+                    </div>
+                `;
+                marker.bindPopup(popupContent);
+
+                // 儲存標記資訊
+                marker._facilityData = facility;
+                allMarkers.push(marker);
+
+                markers.addLayer(marker);
+
+                // marker.on('click', function () {
+                //     highlightVenueInSidebar(facility.Venue_Name_TC || facility.Venue_Name_EN);
+                // });
+            });
+
+            map.addLayer(markers);
+        }
+
+        // 篩選標記根據矩形範圍
+        function filterMarkersByBounds(bounds) {
+            markers.clearLayers();
+
+            const visibleMarkers = allMarkers.filter(marker => {
+                const latLng = marker.getLatLng();
+                return bounds.contains(latLng);
+            });
+
+            visibleMarkers.forEach(marker => {
+                markers.addLayer(marker);
+            });
+
+            updateStatsForVisibleMarkers(visibleMarkers);
+        }
+
+        // 重置所有標記的顯示
+        function resetAllMarkers() {
+            markers.clearLayers();
+            allMarkers.forEach(marker => {
+                markers.addLayer(marker);
+            });
+
+            updateStats();
+            updateSidebarForVisibleMarkers(allMarkers);
+        }
+
+        // 計算可見標記數量
+        function countVisibleMarkers() {
+            return markers.getLayers().length;
+        }
+
+        // 更新統計資料（根據可見標記）
+        function updateStatsForVisibleMarkers(visibleMarkers) {
+            const visibleVenues = visibleMarkers.length;
+            const visibleDistricts = new Set();
+
+            visibleMarkers.forEach(marker => {
+                if (marker._facilityData && marker._facilityData.District_Name_TC) {
+                    visibleDistricts.add(marker._facilityData.District_Name_TC);
+                }
+            });
+
+            document.getElementById('total-venues').textContent = `設施數量: ${visibleVenues}`;
+            document.getElementById('total-sessions').textContent = `時段數量: ${visibleVenues}`;
+            document.getElementById('total-districts').textContent = `地區數量: ${visibleDistricts.size}`;
+
+            // 更新側邊欄顯示
+            updateSidebarForVisibleMarkers(visibleMarkers);
+        }
+
+        // 為地區創建手風琴式選單
+        function createAccordion() {
+            const accordionContainer = document.getElementById('districts-accordion');
+            const loadingIndicator = document.getElementById('loading-indicator');
+
+            if (loadingIndicator && loadingIndicator.parentNode === accordionContainer) {
+                loadingIndicator.remove();
+            }
+
+            accordionContainer.innerHTML = '';
+
+            if (Object.keys(districtVenues).length === 0) {
+                accordionContainer.innerHTML = `
+                    <div style="padding: 20px; text-align: center; color: #666;">
+                        <p>沒有可用的場地資料。</p>
+                    </div>
+                `;
+                return;
+            }
+
+            Object.keys(districtVenues).forEach(district => {
+                const districtId = district;
+                const venueGroups = districtVenues[district];
+                const uniqueVenues = Object.keys(venueGroups).length;
+                const totalSessions = Object.values(venueGroups).reduce((sum, venue) => sum + venue.sessions.length, 0);
+
+                const districtWrapper = document.createElement('div');
+                districtWrapper.className = 'district-wrapper';
+                districtWrapper.style.marginBottom = '10px';
+
+                const districtHeader = document.createElement('div');
+                districtHeader.className = 'district-header';
+                districtHeader.id = `header-${districtId}`;
+                districtHeader.setAttribute('data-district-id', districtId);
+                districtHeader.innerHTML = `
+                    <span><i class="fas fa-map-marker-alt"></i> ${district || '未知地區'} (${uniqueVenues})</span>
+                    <i class="fas fa-chevron-down"></i>
+                `;
+
+                const districtContent = document.createElement('div');
+                districtContent.className = 'district-content';
+                districtContent.id = `content-${districtId}`;
+                districtContent.setAttribute('data-district-id', districtId);
+
+                // 為每個場館創建分組
+                Object.keys(venueGroups).forEach((venueKey, index) => {
+                    const venue = venueGroups[venueKey];
+                    const venueId = `${districtId}-venue-${index}`;
+
+                    // 場館標題
+                    const venueHeader = document.createElement('div');
+                    venueHeader.className = 'venue-header';
+                    venueHeader.id = `venue-header-${venueId}`;
+                    venueHeader.setAttribute('data-venue-id', venueId);
+                    venueHeader.innerHTML = `
+                        <span>${venue.name} (${venue.sessions.length}個時段)</span>
+                        <i class="fas fa-chevron-down"></i>
+                    `;
+
+                    // 場館內容容器
+                    const venueSessions = document.createElement('div');
+                    venueSessions.className = 'venue-sessions';
+                    venueSessions.id = `venue-sessions-${venueId}`;
+
+                    // 場館地址
+                    const venueAddress = document.createElement('div');
+                    venueAddress.className = 'venue-address';
+                    venueAddress.textContent = venue.address;
+                    venueSessions.appendChild(venueAddress);
+
+                    // 添加每個時段
+                    venue.sessions.forEach((session, sessionIndex) => {
+                        const venueElement = document.createElement('div');
+                        const sessionId = `venue-${venueId}-session-${sessionIndex}`;
+                        venueElement.className = 'venue-item';
+                        venueElement.id = sessionId;
+
+                        const sessionTime = `${session.Session_Start_Time || '不適用'} - ${session.Session_End_Time || '不適用'}`;
+                        const availableCourts = parseInt(session.Available_Courts) || 0;
+                        const courtClass = `available-${Math.min(availableCourts, 10)}`;
+
+                        venueElement.innerHTML = `
+                            <h5>${session.Facility_Type_Name_TC || session.Facility_Type_Name_EN || '設施'}</h5>
+                            <div class="session-info">
+                                <div class="session-date">${session.Available_Date || '不適用'}</div>
+                                <div class="session-time">${sessionTime}</div>
+                                <div class="available-courts ${courtClass}">
+                                    ${availableCourts === 0 ? '已滿' : availableCourts + ' 個場地可用'}
+                                </div>
+                            </div>
+                        `;
+
+                        venueElement.addEventListener('click', function (e) {
+                            e.stopPropagation();
+
+                            const lat = parseFloat(session.Venue_Latitude);
+                            const lng = parseFloat(session.Venue_Longitude);
+
+                            if (!isNaN(lat) && !isNaN(lng)) {
+                                map.setView([lat, lng], 16);
+
+                                // 找到對應的標記並打開彈出視窗
+                                markers.eachLayer(function (marker) {
+                                    const markerLatLng = marker.getLatLng();
+                                    if (markerLatLng.lat === lat && markerLatLng.lng === lng) {
+                                        marker.openPopup();
+                                    }
+                                });
+
+                                // 高亮此場地元素
+                                document.querySelectorAll('.venue-item').forEach(item => {
+                                    item.style.boxShadow = '0 2px 4px rgba(0, 0, 0, 0.05)';
+                                });
+                                this.style.boxShadow = '0 0 0 3px rgba(42, 100, 150, 0.3)';
+
+                                // 確保地區和場館都已展開
+                                const districtContent = this.closest('.district-content');
+                                if (districtContent && !districtContent.classList.contains('show')) {
+                                    const districtId = districtContent.getAttribute('data-district-id');
+                                    toggleAccordion(districtId);
+                                }
+
+                                const venueSessions = this.closest('.venue-sessions');
+                                if (venueSessions && !venueSessions.classList.contains('show')) {
+                                    const venueId = this.closest('.venue-header').getAttribute('data-venue-id');
+                                    toggleVenueAccordion(venueId);
+                                }
+                            }
+                        });
+
+                        venueSessions.appendChild(venueElement);
+                    });
+
+                    // 場館點擊事件
+                    venueHeader.addEventListener('click', function (e) {
+                        e.stopPropagation();
+                        const venueId = this.getAttribute('data-venue-id');
+                        if (venueId) {
+                            toggleVenueAccordion(venueId);
+                        }
+                    });
+
+                    districtContent.appendChild(venueHeader);
+                    districtContent.appendChild(venueSessions);
+                });
+
+                // 地區點擊事件
+                districtHeader.addEventListener('click', function (e) {
+                    e.stopPropagation();
+                    const districtId = this.getAttribute('data-district-id');
+                    if (districtId) {
+                        toggleAccordion(districtId);
+                    }
+                });
+
+                districtWrapper.appendChild(districtHeader);
+                districtWrapper.appendChild(districtContent);
+                accordionContainer.appendChild(districtWrapper);
+            });
+
+            // 如果有資料，預設展開第一個地區
+            const firstDistrict = Object.keys(districtVenues)[0];
+            if (firstDistrict) {
+                const firstDistrictId = firstDistrict.replace(/\s+/g, '-').replace(/[^\w-]/g, '');
+                setTimeout(() => toggleAccordion(firstDistrictId), 100);
+            }
+        }
+
+        // 切換地區手風琴
+        function toggleAccordion(districtId) {
+            const content = document.getElementById(`content-${districtId}`);
+            const header = document.getElementById(`header-${districtId}`);
+
+            if (!content || !header) return;
+
+            const icon = header.querySelector('.fa-chevron-down');
+
+            if (content.classList.contains('show')) {
+                // 收合當前區域
+                content.classList.remove('show');
+                header.classList.remove('active');
+                if (icon) icon.style.transform = 'rotate(0deg)';
+                currentOpenDistrict = null;
+            } else {
+                // 收合其他所有區域
+                document.querySelectorAll('.district-content.show').forEach(item => {
+                    if (item.id !== `content-${districtId}`) {
+                        item.classList.remove('show');
+                        const otherHeaderId = item.id.replace('content-', 'header-');
+                        const otherHeader = document.getElementById(otherHeaderId);
+                        if (otherHeader) {
+                            otherHeader.classList.remove('active');
+                            const otherIcon = otherHeader.querySelector('.fa-chevron-down');
+                            if (otherIcon) otherIcon.style.transform = 'rotate(0deg)';
+                        }
+                    }
+                });
+
+                // 展開當前區域
+                content.classList.add('show');
+                header.classList.add('active');
+                if (icon) icon.style.transform = 'rotate(180deg)';
+                currentOpenDistrict = districtId;
+            }
+        }
+
+        // 切換場館手風琴
+        function toggleVenueAccordion(venueId) {
+            const content = document.getElementById(`venue-sessions-${venueId}`);
+            const header = document.getElementById(`venue-header-${venueId}`);
+
+            if (!content || !header) return;
+
+            const icon = header.querySelector('.fa-chevron-down');
+
+            if (content.classList.contains('show')) {
+                content.classList.remove('show');
+                header.classList.remove('active');
+                if (icon) icon.style.transform = 'rotate(0deg)';
+                currentOpenVenue = null;
+            } else {
+                // 收合其他所有場館（可選）
+                document.querySelectorAll(`#content-${venueId.split('-')[0]} .venue-sessions.show`).forEach(item => {
+                    if (item.id !== `venue-sessions-${venueId}`) {
+                        item.classList.remove('show');
+                        const otherHeaderId = item.id.replace('venue-sessions-', 'venue-header-');
+                        const otherHeader = document.getElementById(otherHeaderId);
+                        if (otherHeader) {
+                            otherHeader.classList.remove('active');
+                            const otherIcon = otherHeader.querySelector('.fa-chevron-down');
+                            if (otherIcon) otherIcon.style.transform = 'rotate(0deg)';
+                        }
+                    }
+                });
+
+                content.classList.add('show');
+                header.classList.add('active');
+                if (icon) icon.style.transform = 'rotate(180deg)';
+                currentOpenVenue = venueId;
+            }
+        }
+
+        // 更新側邊欄顯示可見的設施
+        function updateSidebarForVisibleMarkers(visibleMarkers) {
+            // 收集所有可見場館的key
+            const visibleVenueKeys = new Set(
+                visibleMarkers.map(marker => {
+                    const data = marker._facilityData;
+                    const venueName = data.Venue_Name_TC || data.Venue_Name_EN || '未命名場地';
+                    const venueAddress = data.Venue_Address_TC || data.Venue_Address_EN || '地址不詳';
+                    return `${venueName}|${venueAddress}`;
+                })
+            );
+
+            // 首先重置所有元素的顯示狀態
+            document.querySelectorAll('.district-header').forEach(header => {
+                header.style.display = 'flex';
+            });
+
+            document.querySelectorAll('.district-content').forEach(content => {
+                content.style.display = 'block';
+            });
+
+            document.querySelectorAll('.venue-header').forEach(header => {
+                header.style.display = 'flex';
+            });
+
+            document.querySelectorAll('.venue-sessions').forEach(sessions => {
+                sessions.style.display = 'block';
+            });
+
+            document.querySelectorAll('.venue-item').forEach(item => {
+                item.style.display = 'block';
+                item.style.opacity = '1';
+            });
+
+            // 如果沒有選取範圍，顯示所有
+            if (!currentRectangleBounds || visibleMarkers.length === allMarkers.length) {
+                // 更新地區計數為全部場館
+                document.querySelectorAll('.district-header').forEach(header => {
+                    const districtText = header.querySelector('span').textContent;
+                    const districtName = districtText.split(' (')[0].replace('📍 ', '');
+
+                    if (districtVenues[districtName]) {
+                        const venueCount = Object.keys(districtVenues[districtName]).length;
+                        header.querySelector('span').innerHTML = `<i class="fas fa-map-marker-alt"></i> ${districtName} (${venueCount})`;
+                    }
+                });
+                return;
+            }
+
+            // 如果有選取範圍，只顯示範圍內的場館
+            let totalVisibleDistricts = 0;
+
+            document.querySelectorAll('.district-header').forEach(header => {
+                const districtText = header.querySelector('span').textContent;
+                const districtName = districtText.split(' (')[0].replace('📍 ', '');
+
+                if (districtVenues[districtName]) {
+                    let visibleVenueCount = 0;
+                    let hasVisibleItems = false;
+
+                    // 檢查這個地區是否有可見的場館
+                    Object.keys(districtVenues[districtName]).forEach(venueKey => {
+                        if (visibleVenueKeys.has(venueKey)) {
+                            visibleVenueCount++;
+                            hasVisibleItems = true;
+                        }
+                    });
+
+                    // 更新地區計數
+                    header.querySelector('span').innerHTML = `<i class="fas fa-map-marker-alt"></i> ${districtName} (${visibleVenueCount})`;
+
+                    // 獲取地區內容容器
+                    const districtId = districtName.replace(/\s+/g, '-').replace(/[^\w-]/g, '');
+                    const districtContent = document.getElementById(`content-${districtId}`);
+
+                    if (districtContent) {
+                        if (hasVisibleItems) {
+                            // 地區有可見場館，顯示地區
+                            header.style.display = 'flex';
+                            districtContent.style.display = 'block';
+                            totalVisibleDistricts++;
+
+                            // 在這個地區內處理每個場館
+                            const venueHeaders = districtContent.querySelectorAll('.venue-header');
+                            venueHeaders.forEach(venueHeader => {
+                                const venueId = venueHeader.getAttribute('data-venue-id');
+                                const venueName = venueHeader.querySelector('span').textContent.split(' (')[0].trim();
+
+                                // 尋找對應的venueKey
+                                let venueKeyMatch = null;
+                                for (const key of visibleVenueKeys) {
+                                    if (key.startsWith(venueName + '|')) {
+                                        venueKeyMatch = key;
+                                        break;
+                                    }
+                                }
+
+                                const venueSessions = document.getElementById(`venue-sessions-${venueId}`);
+                                const venueItems = venueSessions?.querySelectorAll('.venue-item') || [];
+
+                                if (venueKeyMatch && visibleVenueKeys.has(venueKeyMatch)) {
+                                    // 這個場館可見
+                                    venueHeader.style.display = 'flex';
+                                    if (venueSessions) venueSessions.style.display = 'block';
+
+                                    // 顯示這個場館的所有時段
+                                    venueItems.forEach(item => {
+                                        item.style.display = 'block';
+                                        item.style.opacity = '1';
+                                    });
+                                } else {
+                                    // 這個場館不可見
+                                    venueHeader.style.display = 'none';
+                                    if (venueSessions) venueSessions.style.display = 'none';
+                                    venueItems.forEach(item => {
+                                        item.style.display = 'none';
+                                    });
+                                }
+                            });
+                        } else {
+                            // 地區沒有可見場館，隱藏整個地區
+                            header.style.display = 'none';
+                            districtContent.style.display = 'none';
+                        }
+                    }
+                }
+            });
+
+            // 更新統計
+            const visibleVenueCount = visibleVenueKeys.size;
+            document.getElementById('total-venues').textContent = `場館數量: ${visibleVenueCount}`;
+            document.getElementById('total-sessions').textContent = `時段數量: ${visibleMarkers.length}`;
+            document.getElementById('total-districts').textContent = `地區數量: ${totalVisibleDistricts}`;
+        }
+
+        // 點擊標記時在側邊欄中高亮場地
+        function highlightVenueInSidebar(venueName) {
+            if (!venueName) return;
+
+            // 尋找包含此場館名稱的所有元素
+            const venueHeaders = document.querySelectorAll('.venue-header span');
+            venueHeaders.forEach(header => {
+                if (header.textContent.includes(venueName)) {
+                    const venueHeader = header.closest('.venue-header');
+                    const venueId = venueHeader.getAttribute('data-venue-id');
+
+                    // 確保展開
+                    const venueSessions = document.getElementById(`venue-sessions-${venueId}`);
+                    if (venueSessions && !venueSessions.classList.contains('show')) {
+                        toggleVenueAccordion(venueId);
+                    }
+
+                    // 滾動到該場館
+                    venueHeader.scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+                    // 高亮
+                    document.querySelectorAll('.venue-header').forEach(item => {
+                        item.style.backgroundColor = '#e9ecef';
+                    });
+                    venueHeader.style.backgroundColor = '#cfe2ff';
+                }
+            });
+        }
+
+        // 更新統計資料
+        function updateStats() {
+            let totalVenues = 0;
+            let totalSessions = 0;
+            const totalDistricts = Object.keys(districtVenues).length;
+
+            // 計算不重複的場館數量和總時段數量
+            Object.values(districtVenues).forEach(district => {
+                totalVenues += Object.keys(district).length;
+                Object.values(district).forEach(venue => {
+                    totalSessions += venue.sessions.length;
+                });
+            });
+
+            document.getElementById('total-venues').textContent = `場館數量: ${totalVenues}`;
+            document.getElementById('total-sessions').textContent = `時段數量: ${totalSessions}`;
+            document.getElementById('total-districts').textContent = `地區數量: ${totalDistricts}`;
+        }
+
+        // 初始化應用程式
+        function init() {
+            // 設定控制按鈕
+            document.getElementById('zoom-to-hk').addEventListener('click', function () {
+                map.setView([22.3964, 114.1095], 11);
+                resetAllMarkers();
+                clearAllBtn.classList.remove('visible');
+            });
+
+            document.getElementById('reset-view').addEventListener('click', function () {
+                map.setView([22.3964, 114.1095], 11);
+                markers.clearLayers();
+                createMarkers();
+                clearAllBtn.classList.remove('visible');
+                updateStats();
+            });
+
+            document.getElementById('expand-all').addEventListener('click', function () {
+                // 展開所有地區
+                document.querySelectorAll('.district-content').forEach(content => {
+                    const districtId = content.id.replace('content-', '');
+                    const header = document.getElementById(`header-${districtId}`);
+                    const icon = header.querySelector('.fa-chevron-down');
+
+                    content.classList.add('show');
+                    header.classList.add('active');
+                    if (icon) icon.style.transform = 'rotate(180deg)';
+                });
+                // 展開所有場館
+                document.querySelectorAll('.venue-sessions').forEach(content => {
+                    const venueId = content.id.replace('venue-sessions-', '');
+                    const header = document.getElementById(`venue-header-${venueId}`);
+                    const icon = header.querySelector('.fa-chevron-down');
+
+                    content.classList.add('show');
+                    header.classList.add('active');
+                    if (icon) icon.style.transform = 'rotate(180deg)';
+                });
+                currentOpenDistrict = null;
+                currentOpenVenue = null;
+            });
+
+            document.getElementById('collapse-all').addEventListener('click', function () {
+                // 收合所有地區
+                document.querySelectorAll('.district-content').forEach(content => {
+                    const districtId = content.id.replace('content-', '');
+                    const header = document.getElementById(`header-${districtId}`);
+                    const icon = header.querySelector('.fa-chevron-down');
+
+                    content.classList.remove('show');
+                    header.classList.remove('active');
+                    if (icon) icon.style.transform = 'rotate(0deg)';
+                });
+                // 收合所有場館
+                document.querySelectorAll('.venue-sessions').forEach(content => {
+                    const venueId = content.id.replace('venue-sessions-', '');
+                    const header = document.getElementById(`venue-header-${venueId}`);
+                    const icon = header.querySelector('.fa-chevron-down');
+
+                    content.classList.remove('show');
+                    header.classList.remove('active');
+                    if (icon) icon.style.transform = 'rotate(0deg)';
+                });
+                currentOpenDistrict = null;
+                currentOpenVenue = null;
+            });
+
+            // 從 API 獲取資料
+            fetchData();
+
+            // 為首次使用者顯示歡迎訊息
+            if (!localStorage.getItem('mapScopeTutorialShown')) {
+                setTimeout(() => {
+                    showNotification('歡迎使用香港體育設施地圖！使用矩形工具選擇範圍篩選設施', 'info');
+                    localStorage.setItem('mapScopeTutorialShown', 'true');
+                }, 1000);
+            }
+        }
+
+        // 頁面載入時初始化
+        document.addEventListener('DOMContentLoaded', init);
+
+        // 處理視窗大小調整
+        window.addEventListener('resize', () => {
+            if (window.innerWidth <= 768) {
+                controlPanel.classList.remove('mobile-visible');
+                panelVisible = false;
+                panelOverlay.classList.remove('visible');
+            } else {
+                controlPanel.classList.add('mobile-visible');
+                panelVisible = true;
+            }
+            setTimeout(() => map.invalidateSize(), 100);
+        });
+    </script>
+</body>
+
+</html>
